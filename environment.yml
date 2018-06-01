@@ -1,0 +1,14 @@
+channels:
+- conda-forge
+- defaults
+dependencies:
+- python=3.6
+- ipython
+- ipyparallel
+- jupyter
+- matplotlib=2.0.2
+- numpy
+- scipy
+- scikit-image
+- pandas
+- openpyxl
