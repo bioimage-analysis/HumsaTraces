@@ -10,6 +10,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 def find_sync(d, metadata, corr,regions_ch2, labels, cell_position, sync_time=1, show=False, sea_peak = None, save=False, path=''):
     tt = np.asarray(metadata['TimePoint'])
+    window = tt[sync_time]
     indexes = []
     for count, traces in enumerate(d):
         label = count+1
@@ -25,7 +26,7 @@ def find_sync(d, metadata, corr,regions_ch2, labels, cell_position, sync_time=1,
         for a2 in a1:
             sync_a = []
             for a3, b in indexes:
-                if np.any(np.isclose(a2, a3, atol = sync_time)):
+                if np.any(np.isclose(a2, a3, atol = window)):
                     sync_a.append((b,a2))
         sync.append(sync_a)
 
@@ -78,7 +79,7 @@ def _plot(tt, corr, numb_peak, labels, cell_position, ind_network, list_option, 
     plt.figure(figsize=(16,16))
     ax = plt.gca()
 
-    im = ax.imshow(corr)
+    im = ax.imshow(corr, cmap="gray", alpha=0.8)
     plt.axis('off')
 
     divider = make_axes_locatable(ax)
