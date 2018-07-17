@@ -8,19 +8,33 @@ import matplotlib.cm as cmx
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
-def find_sync(d, metadata, corr,regions_ch2, labels, cell_position, sync_time=1, show=False, sea_peak = None, save=False, path=''):
+def find_sync(d, metadata, corr,regions_ch2, labels, cell_position, sync_time=1,
+              roi = False, tmin = 2000, tmax = 3000, dmin = 39, dmax = 48,
+              show=False, sea_peak = None, save=False, path=''):
     tt = np.asarray(metadata['TimePoint'])
+    dmin = dmin-1
+    if roi == True:
+        tt = tt[tmin:tmax]
+        regions_ch2 = regions_ch2[tmin:tmax]
+        d = d[dmin:dmax, tmin:tmax]
     window = tt[sync_time]
     indexes = []
+    peak_value = []
+    if roi == False:
+        dmin = 0
     for count, traces in enumerate(d):
-        label = count+1
+        label = count+1+dmin
         if sea_peak is not None and label == sea_peak:
-            ind = detect_peaks(traces, mph=0.75, mpd=25, valley=False, show=True)
+            ind, spike = detect_peaks(traces, mph=0.3, mpd=40,
+                                       title = sea_peak,
+                                       valley=False,
+                                       show=True, save = save, path=path)
         else:
-            ind = detect_peaks(traces, mph=0.75, mpd=25, valley=False, show=False)
+            ind, spike = detect_peaks(traces, mph=0.3, mpd=40, valley=False, show=False)
         if ind.size>0:
-            indexes.append((tt[ind].tolist(), label))
-
+            indexes.append((tt[np.rint(spike).astype(int)].tolist(), label))
+        peak_value.append((np.around(traces[ind], decimals=2), label))
+    '''
     sync = []
     for a1, b1 in indexes:
         for a2 in a1:
@@ -29,9 +43,25 @@ def find_sync(d, metadata, corr,regions_ch2, labels, cell_position, sync_time=1,
                 if np.any(np.isclose(a2, a3, atol = window)):
                     sync_a.append((b,a2))
         sync.append(sync_a)
+    '''
 
-    label_coord = [(prop.label, prop.centroid) for prop in regions_ch2[0]]
+    import itertools
+    sync = []
+    sync_df = []
+    for a, b in itertools.permutations(indexes, 2):
+        for num in a[0]:
+            for num2 in b[0]:
+                if num-window <= num2 <= num+window:
+                    sync_a = (b[1], num2)
+                    sync.append(((a[1], num), sync_a))
+                    sync_df.append((a[1],b[1]))
+    from operator import itemgetter
+    sync_to_df = [(k, list(set(list(zip(*g))[1]))) for k, g in itertools.groupby(sync_df, itemgetter(0))]
 
+    if roi == True:
+        label_coord = [(prop.label, prop.centroid) for prop in regions_ch2[0][dmin:dmax]]
+    else:
+        label_coord = [(prop.label, prop.centroid) for prop in regions_ch2[0]]
     coord_network = []
     ind_network=[]
     for label in sync:
@@ -46,6 +76,7 @@ def find_sync(d, metadata, corr,regions_ch2, labels, cell_position, sync_time=1,
         coord_network.append(coord_net)
         ind_network.append(net_ind)
 
+    '''
     list_option=[]
     for coord in coord_network:
         list_beta =[]
@@ -53,6 +84,7 @@ def find_sync(d, metadata, corr,regions_ch2, labels, cell_position, sync_time=1,
             list_beta.append(x)
         list_option.append(list_beta)
 
+    '''
     numb_peak = []
     for ind in indexes:
         for coord in label_coord:
@@ -60,9 +92,9 @@ def find_sync(d, metadata, corr,regions_ch2, labels, cell_position, sync_time=1,
                 numb_peak.append((coord[1], len(ind[0])))
 
     if show:
-        _plot(tt, corr, numb_peak, labels, cell_position, ind_network, list_option, save=save, path=path)
+        _plot(tt, corr, numb_peak, labels, cell_position, ind_network, coord_network, save=save, path=path)
 
-    return indexes, sync
+    return indexes, sync_to_df, peak_value
 
 def _plot(tt, corr, numb_peak, labels, cell_position, ind_network, list_option, save=False, path=''):
 
@@ -96,16 +128,16 @@ def _plot(tt, corr, numb_peak, labels, cell_position, ind_network, list_option, 
 
     i=0
     for lab, coord in zip(labels, cell_position):
-        ax.annotate(str(lab),tuple(x+5 for x in coord[::-1]), color='white', fontsize=14,weight ='bold', alpha = 0.5)
+        ax.annotate(str(lab),tuple(x+5 for x in coord[::-1]), color='red', fontsize=14,weight ='bold', alpha = 0.5)
         colorVal3 = scalarMap2.to_rgba(values2[0])
         ax.scatter(coord[::-1][0], coord[::-1][1], color=colorVal3, s=100)
 
-    for ind, net, peak in zip(ind_network, list_option, numb_peak):
-        arr = np.asarray(net)
+    for peak in numb_peak:
         colorVal2 = scalarMap2.to_rgba(values2[peak[1]])
         sc = ax.scatter(peak[0][1],peak[0][0], color=colorVal2, s=100)
 
-
+    for ind, net in zip(ind_network, list_option):
+        arr = np.asarray(net)
         if arr.shape[0]>0:
             colorVal = scalarMap.to_rgba(values[int(np.mean(ind))])
 
@@ -115,15 +147,15 @@ def _plot(tt, corr, numb_peak, labels, cell_position, ind_network, list_option, 
             ax.plot(arr_s[:,1],arr_s[:,0], color=colorVal)
 
     if save:
-        filename = 'plot_correlation.png'
+        filename = 'plot_correlation.pdf'
         if os.path.isfile(path+filename):
             expand = 0
             while True:
                 expand += 1
-                new_filename = filename.split(".png")[0] + "_" +str(expand) + ".png"
+                new_filename = filename.split(".pdf")[0] + "_" +str(expand) + ".pdf"
                 if os.path.isfile(path+new_filename):
                     continue
                 else:
                     filename = new_filename
                     break
-        plt.savefig(path+filename)
+        plt.savefig(path+"_"+filename, transparent=True)

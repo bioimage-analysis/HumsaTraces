@@ -5,13 +5,18 @@ import matplotlib.pyplot as plt
 from skimage.measure import regionprops
 from skimage import segmentation
 
-def _dff(mean_int_over_time, window=40, percentile=20):
+def _dff(mean_int_over_time, window=140, percentile=10):
+
     traceBL = [np.percentile(mean_int_over_time[i:i + window], percentile)
                        for i in range(1, len(mean_int_over_time) - window)]
     missing = np.percentile(mean_int_over_time[-window:], percentile)
     missing = np.repeat(missing, window + 1)
 
     traceBL = np.concatenate((traceBL, missing))
+
+    #fig, (ax) = plt.subplots(1,1, figsize=(8,16))
+    #ax.plot(traceBL, color="red")
+    #ax.plot(mean_int_over_time)
 
     return np.divide((mean_int_over_time-traceBL), traceBL)
 
@@ -33,7 +38,9 @@ def create_traces(ch2_reg,seg_ch1):
 
     return d, data, cell_position, labels, regions_ch2
 
-def plot_traces(corr, metadata, data, cleaned_ch1, cell_position, labels, save=False, path=''):
+def plot_traces(corr, metadata, data, cleaned_ch1, cell_position, labels,
+                plot_all = True, ymin = 10, ymax = 20, tmin = 100, tmax = 200,
+                colormap = False, save=False, path=''):
 
     t=np.asarray(metadata['TimePoint'])
     plt.figure()
@@ -48,6 +55,10 @@ def plot_traces(corr, metadata, data, cleaned_ch1, cell_position, labels, save=F
         ax1.annotate(str(lab), coord[::-1], color='white', fontsize=14,weight ='bold')
     ax1.set_title('Correlation image and contour plots of cells')
 
+    if plot_all == False:
+        data = data[:, ymin-1:ymax]
+        labels = labels[ymin-1:ymax]
+
 
     numSamples, numRows = data.shape
 
@@ -55,11 +66,16 @@ def plot_traces(corr, metadata, data, cleaned_ch1, cell_position, labels, save=F
     # Plot the EEG
     ticklocs = []
     #ax2 = fig.add_subplot(1, 1, 1)
-    ax2.set_xlim(0, t.max())
+
     #ax2.set_xticks(np.arange(40))
     dmin = data.min()
     dmax = data.max()
-    dr = (dmax - dmin) * 0.7  # Crowd them a bit.
+    if plot_all == False:
+        dr =  (dmax - dmin)
+        ax2.set_xlim(tmin, tmax)
+    else:
+        dr = (dmax - dmin) * 0.7  # Crowd them a bit.
+        ax2.set_xlim(t.min(), t.max())
     y0 = dmin
     y1 = (numRows - 1) * dr + dmax
     ax2.set_ylim(y0, y1)
@@ -72,8 +88,11 @@ def plot_traces(corr, metadata, data, cleaned_ch1, cell_position, labels, save=F
     offsets = np.zeros((numRows, 2), dtype=float)
     offsets[:, 1] = ticklocs
 
-    cmap=plt.cm.viridis
-    colors = cmap(np.linspace(0, 1, data.shape[1]))
+    if colormap:
+        cmap=plt.cm.viridis
+        colors = cmap(np.linspace(0, 1, data.shape[1]))
+    else:
+        colors= "black"
 
     lines = LineCollection(segs, offsets=offsets, transOffset=None, colors = colors)
     ax2.add_collection(lines)
@@ -88,15 +107,15 @@ def plot_traces(corr, metadata, data, cleaned_ch1, cell_position, labels, save=F
 
     plt.tight_layout()
     if save:
-        filename = 'plot_traces.png'
+        filename = 'plot_traces.pdf'
         if os.path.isfile(path+filename):
             expand = 0
             while True:
                 expand += 1
-                new_filename = filename.split(".png")[0] + "_" +str(expand) + ".png"
+                new_filename = filename.split(".pdf")[0] + "_" +str(expand) + ".pdf"
                 if os.path.isfile(path+new_filename):
                     continue
                 else:
                     filename = new_filename
                     break
-        plt.savefig(path+filename)
+        plt.savefig(path+"_"+filename, transparent=True)

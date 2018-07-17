@@ -6,6 +6,9 @@ from scipy.ndimage.interpolation import shift
 
 def list_shift(img):
 
+    if len(img)%10!=0:
+        raise ValueError("Your stack need to be divisible by 10")
+
     if len(img)%200!=0:
         size = len(img)-len(img)%200
         split = len(img[0:size])/200
@@ -19,12 +22,14 @@ def list_shift(img):
 
     shifts = np.zeros(2)
     add=0
+
     for im in l:
         i=0
         for val in values:
             if i%4==0:
                 add = shifts[-1]
             try:
+
                 shift, _, _ = register_translation(im[0], im[val], 100)
                 shift = shift+add
             except IndexError:

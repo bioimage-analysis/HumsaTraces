@@ -3,14 +3,25 @@
 
 from __future__ import division, print_function
 import numpy as np
+from scipy.signal import peak_widths
+import os
 
 __author__ = "Marcos Duarte, https://github.com/demotu/BMC"
 __version__ = "1.0.4"
 __license__ = "MIT"
 
+def _smooth(x,window_len=20,window='hanning'):
+    """smooth the data using a window with requested size."""
+
+
+    s=np.r_[x[window_len-1:0:-1],x,x[-2:-window_len-1:-1]]
+    w=np.hanning(window_len)
+    y=np.convolve(w/w.sum(),s,mode='valid')
+    return y
 
 def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
-                 kpsh=False, valley=False, show=False, ax=None):
+                 kpsh=False, title = "", valley=False, show=False, ax=None,
+                 path='', save=False):
 
     """Detect peaks in data based on their amplitude and other features.
 
@@ -85,7 +96,10 @@ def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
     >>> # set threshold = 2
     >>> detect_peaks(x, threshold = 2, show=True)
     """
-
+    # Will use data for plotting the raw data
+    data = x
+    # Smoothing allow to avoid taking peaks in the noise
+    x = _smooth(x)
     x = np.atleast_1d(x).astype('float64')
     if x.size < 3:
         return np.array([], dtype=int)
@@ -135,41 +149,66 @@ def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
                 idel[i] = 0  # Keep current peak
         # remove the small peaks and sort back the indices by their occurrence
         ind = np.sort(ind[~idel])
+    # Had to add this line because smoothing increase the size of data by window size
+    ind = np.delete(ind, np.where(ind>len(x)))
+    _, _, spike, _ = peak_widths(x, ind, rel_height=0.95)
+    # Had to add this line because smoothing increase the size of data by window size
+    spike = np.delete(spike, np.where(ind>len(x)))
 
     if show:
         if indnan.size:
             x[indnan] = np.nan
         if valley:
             x = -x
-        _plot(x, mph, mpd, threshold, edge, valley, ax, ind)
+        _plot(data, spike, mph, mpd, threshold, edge, valley, ax, ind,
+              title= title, save = save, path=path)
 
-    return ind
+    return ind, spike
 
-def _plot(x, mph, mpd, threshold, edge, valley, ax, ind):
+def _plot(x, spike, mph, mpd, threshold, edge, valley, ax, ind, title,
+          save=False, path=''):
     """Plot results of the detect_peaks function, see its help."""
+
+
     try:
         import matplotlib.pyplot as plt
+        #plt.eventplot(results_full[2], colors = [[1, 0, 0]], linelengths = 0.2)
     except ImportError:
         print('matplotlib is not available.')
     else:
         if ax is None:
             _, ax = plt.subplots(1, 1, figsize=(8, 4))
 
-        ax.plot(x, 'b', lw=1)
+        ax.plot(x, color="black", lw=1)
         if ind.size:
             label = 'valley' if valley else 'peak'
             label = label + 's' if ind.size > 1 else label
             ax.plot(ind, x[ind], '+', mfc=None, mec='r', mew=2, ms=8,
                     label='%d %s' % (ind.size, label))
+            ax.eventplot(spike, colors = [[1, 0, 0]],
+                         lineoffsets= -0.2, linelengths = 0.3,
+                         label='spikes')
             ax.legend(loc='best', framealpha=.5, numpoints=1)
         ax.set_xlim(-.02*x.size, x.size*1.02-1)
         ymin, ymax = x[np.isfinite(x)].min(), x[np.isfinite(x)].max()
         yrange = ymax - ymin if ymax > ymin else 1
         ax.set_ylim(ymin - 0.1*yrange, ymax + 0.1*yrange)
-        ax.set_xlabel('Data #', fontsize=14)
+        ax.set_xlabel('Frame', fontsize=14)
         ax.set_ylabel('Amplitude', fontsize=14)
         mode = 'Valley detection' if valley else 'Peak detection'
-        ax.set_title("%s (mph=%s, mpd=%d, threshold=%s, edge='%s')"
-                     % (mode, str(mph), mpd, str(threshold), edge))
+        ax.set_title("%s (cell=%s)"
+                     % (mode, str(title)))
         # plt.grid()
-        plt.show()
+        if save:
+            filename = 'single_trace_cell_{}.pdf'.format(str(title))
+            if os.path.isfile(path+filename):
+                expand = 0
+                while True:
+                    expand += 1
+                    new_filename = filename.split(".pdf")[0] + "_" +str(expand) + ".pdf"
+                    if os.path.isfile(path+new_filename):
+                        continue
+                    else:
+                        filename = new_filename
+                        break
+            plt.savefig(path+"_"+filename, transparent=True)

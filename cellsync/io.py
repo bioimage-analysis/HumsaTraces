@@ -53,8 +53,10 @@ def open_file(directory, metadata, ch = '/channel_1'):
     #list_file = glob.glob(directory + ch + '/*tif')
     #list_file.sort()
     list_file = io.ImageCollection(directory + ch + '/*tif')
-    stack = np.empty([m['sizeT'], m['shapeY'], m['shapeX']]).astype(m['dtype'])
-    for plane, img in enumerate(list_file):
-        stack[plane] = img
-
-    return(stack)
+    if not list_file:
+        print('Change name of "channel 1" to "channel_1" in the path')
+    else:
+        stack = np.empty([m['sizeT'], m['shapeY'], m['shapeX']]).astype(m['dtype'])
+        for plane, img in enumerate(list_file):
+            stack[plane] = img
+        return(stack)
