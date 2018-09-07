@@ -10,7 +10,8 @@ def slic_segment(registered_img, strength = 200):
     img_split_median = np.median(np.stack(img_split), axis=1)
 
     to_seg = np.median(img_split_median,axis=0)
-    segments_slic = segmentation.slic(to_seg, n_segments=750, compactness=300, sigma=0, multichannel=False)
+    segments_slic = segmentation.slic(to_seg, n_segments=750, compactness=300,
+                                      sigma=0, multichannel=False)
 
     labeled = label(segments_slic, background=0)
     regions = regionprops(labeled, to_seg)

@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 
-def to_df(indexes, sync, peak_value, d, metadata, save=False, path=''):
+def to_df(indexes, sync, peak_value, d, metadata, save=False, path='',filename_roi=''):
 
     Time = metadata['TimePoint']
 
@@ -37,8 +37,9 @@ def to_df(indexes, sync, peak_value, d, metadata, save=False, path=''):
     df1 = pd.DataFrame(d, index=range(1, len(d)+1),
                        columns=Time)
     if save:
-        filename = 'result.xlsx'
-        if os.path.isfile(path+filename):
+        path_name = path.replace("/","_")
+        filename = path_name+'result'+filename_roi+'.xlsx'
+        if os.path.isfile(path+'/'+filename):
             expand = 0
             while True:
                 expand += 1
@@ -48,7 +49,7 @@ def to_df(indexes, sync, peak_value, d, metadata, save=False, path=''):
                 else:
                     filename = new_filename
                     break
-        writer = pd.ExcelWriter(path+"_"+filename)
+        writer = pd.ExcelWriter(path+'/'+filename)
         df.to_excel(writer,'Sheet1')
         df1.to_excel(writer,'Sheet2')
         writer.save()

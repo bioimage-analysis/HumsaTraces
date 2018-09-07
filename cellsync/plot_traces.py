@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from skimage.measure import regionprops
 from skimage import segmentation
 
-def _dff(mean_int_over_time, window=140, percentile=10):
+def _dff(mean_int_over_time, window=40, percentile=20):
 
     traceBL = [np.percentile(mean_int_over_time[i:i + window], percentile)
                        for i in range(1, len(mean_int_over_time) - window)]
@@ -20,11 +20,21 @@ def _dff(mean_int_over_time, window=140, percentile=10):
 
     return np.divide((mean_int_over_time-traceBL), traceBL)
 
-def create_traces(ch2_reg,seg_ch1):
+def create_traces(ch2_reg,seg_ch1, window=40, to_remove=None):
 
     regions_ch2 = [regionprops(seg_ch1, ch2) for ch2 in ch2_reg]
-    cell_position = [regions_ch2[0][i]['centroid'] for i in range(len(regions_ch2[0]))]
     labels = [regions_ch2[0][i]['label'] for i in range(len(regions_ch2[0]))]
+    # Removing cell that we don't want
+    cleaned = np.copy(seg_ch1)
+    if to_remove is not None:
+        for label, region in zip(labels, regions_ch2[0]):
+            if label == to_remove:
+                cleaned[tuple(region.coords.T)] = 0
+        regions_ch2 = [regionprops(cleaned, ch2) for ch2 in ch2_reg]
+        labels = [regions_ch2[0][i]['label'] for i in range(len(regions_ch2[0]))]
+
+    cell_position = [regions_ch2[0][i]['centroid'] for i in range(len(regions_ch2[0]))]
+
 
     list_intensity =[]
     for i in range(len(regions_ch2[0])):
@@ -32,15 +42,15 @@ def create_traces(ch2_reg,seg_ch1):
 
     list_dff=[]
     for mean_int in list_intensity:
-        list_dff.append(_dff(mean_int))
+        list_dff.append(_dff(mean_int, window=window))
     d=np.asarray(list_dff)
     data = np.transpose(d, (1,0))
 
-    return d, data, cell_position, labels, regions_ch2
+    return d, data, cell_position, labels, regions_ch2, cleaned
 
 def plot_traces(corr, metadata, data, cleaned_ch1, cell_position, labels,
                 plot_all = True, ymin = 10, ymax = 20, tmin = 100, tmax = 200,
-                colormap = False, save=False, path=''):
+                colormap = False, save=False, path='',filename_roi=''):
 
     t=np.asarray(metadata['TimePoint'])
     plt.figure()
@@ -55,7 +65,9 @@ def plot_traces(corr, metadata, data, cleaned_ch1, cell_position, labels,
         ax1.annotate(str(lab), coord[::-1], color='white', fontsize=14,weight ='bold')
     ax1.set_title('Correlation image and contour plots of cells')
 
-    if plot_all == False:
+    if plot_all == False and ymin==None:
+        data = data
+    elif plot_all == False:
         data = data[:, ymin-1:ymax]
         labels = labels[ymin-1:ymax]
 
@@ -70,6 +82,7 @@ def plot_traces(corr, metadata, data, cleaned_ch1, cell_position, labels,
     #ax2.set_xticks(np.arange(40))
     dmin = data.min()
     dmax = data.max()
+
     if plot_all == False:
         dr =  (dmax - dmin)
         ax2.set_xlim(tmin, tmax)
@@ -107,8 +120,9 @@ def plot_traces(corr, metadata, data, cleaned_ch1, cell_position, labels,
 
     plt.tight_layout()
     if save:
-        filename = 'plot_traces.pdf'
-        if os.path.isfile(path+filename):
+        path_name = path.replace("/","_")
+        filename = path_name+'plot_traces'+filename_roi+'.pdf'
+        if os.path.isfile(path+'/'+filename):
             expand = 0
             while True:
                 expand += 1
@@ -118,4 +132,4 @@ def plot_traces(corr, metadata, data, cleaned_ch1, cell_position, labels,
                 else:
                     filename = new_filename
                     break
-        plt.savefig(path+"_"+filename, transparent=True)
+        plt.savefig(path+'/'+filename, transparent=True)

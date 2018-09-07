@@ -10,7 +10,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 def find_sync(d, metadata, corr,regions_ch2, labels, cell_position, sync_time=1,
               roi = False, tmin = 2000, tmax = 3000, dmin = 39, dmax = 48,
-              show=False, sea_peak = None, save=False, path=''):
+              show=False, sea_peak = None, save=False, path='',filename_roi=''):
     tt = np.asarray(metadata['TimePoint'])
     dmin = dmin-1
     if roi == True:
@@ -25,12 +25,11 @@ def find_sync(d, metadata, corr,regions_ch2, labels, cell_position, sync_time=1,
     for count, traces in enumerate(d):
         label = count+1+dmin
         if sea_peak is not None and label == sea_peak:
-            ind, spike = detect_peaks(traces, mph=0.3, mpd=40,
-                                       title = sea_peak,
-                                       valley=False,
-                                       show=True, save = save, path=path)
+            ind, spike = detect_peaks(traces,title = sea_peak,
+                                       show=True, save = save, path=path,
+                                       filename_roi=filename_roi)
         else:
-            ind, spike = detect_peaks(traces, mph=0.3, mpd=40, valley=False, show=False)
+            ind, spike = detect_peaks(traces, show=False)
         if ind.size>0:
             indexes.append((tt[np.rint(spike).astype(int)].tolist(), label))
         peak_value.append((np.around(traces[ind], decimals=2), label))
@@ -92,11 +91,13 @@ def find_sync(d, metadata, corr,regions_ch2, labels, cell_position, sync_time=1,
                 numb_peak.append((coord[1], len(ind[0])))
 
     if show:
-        _plot(tt, corr, numb_peak, labels, cell_position, ind_network, coord_network, save=save, path=path)
+        _plot(tt, corr, numb_peak, labels, cell_position, ind_network,
+              coord_network, save=save, path=path,filename_roi=filename_roi)
 
     return indexes, sync_to_df, peak_value
 
-def _plot(tt, corr, numb_peak, labels, cell_position, ind_network, list_option, save=False, path=''):
+def _plot(tt, corr, numb_peak, labels, cell_position, ind_network, list_option,
+          save=False, path='',filename_roi=''):
 
     values = range(int(tt.max()))
     jet = cm = plt.get_cmap('jet')
@@ -147,8 +148,9 @@ def _plot(tt, corr, numb_peak, labels, cell_position, ind_network, list_option, 
             ax.plot(arr_s[:,1],arr_s[:,0], color=colorVal)
 
     if save:
-        filename = 'plot_correlation.pdf'
-        if os.path.isfile(path+filename):
+        path_name = path.replace("/","_")
+        filename = path_name+'plot_correlation'+filename_roi+'.pdf'
+        if os.path.isfile(path+'/'+filename):
             expand = 0
             while True:
                 expand += 1
@@ -158,4 +160,4 @@ def _plot(tt, corr, numb_peak, labels, cell_position, ind_network, list_option, 
                 else:
                     filename = new_filename
                     break
-        plt.savefig(path+"_"+filename, transparent=True)
+        plt.savefig(path+'/'+filename, transparent=True)

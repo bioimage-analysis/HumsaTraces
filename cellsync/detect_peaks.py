@@ -4,6 +4,7 @@
 from __future__ import division, print_function
 import numpy as np
 from scipy.signal import peak_widths
+from scipy.signal import find_peaks_cwt
 import os
 
 __author__ = "Marcos Duarte, https://github.com/demotu/BMC"
@@ -19,9 +20,9 @@ def _smooth(x,window_len=20,window='hanning'):
     y=np.convolve(w/w.sum(),s,mode='valid')
     return y
 
-def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
-                 kpsh=False, title = "", valley=False, show=False, ax=None,
-                 path='', save=False):
+def detect_peaks(x, mph=0.3, mpd=40, threshold=0, edge='rising',
+                 kpsh=True, title = "", valley=False, show=False, ax=None,
+                 path='', save=False,filename_roi=''):
 
     """Detect peaks in data based on their amplitude and other features.
 
@@ -150,23 +151,23 @@ def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
         # remove the small peaks and sort back the indices by their occurrence
         ind = np.sort(ind[~idel])
     # Had to add this line because smoothing increase the size of data by window size
-    ind = np.delete(ind, np.where(ind>len(x)))
-    _, _, spike, _ = peak_widths(x, ind, rel_height=0.95)
+    ind = np.delete(ind, np.where(ind>=len(data)))
+    _, _, spike, _ = peak_widths(x, ind, rel_height=0.85)
     # Had to add this line because smoothing increase the size of data by window size
-    spike = np.delete(spike, np.where(ind>len(x)))
+    spike = np.delete(spike, np.where(ind>=len(data)))
 
     if show:
         if indnan.size:
-            x[indnan] = np.nan
+            data[indnan] = np.nan
         if valley:
             x = -x
-        _plot(data, spike, mph, mpd, threshold, edge, valley, ax, ind,
-              title= title, save = save, path=path)
+        _plot(x, spike, mph, mpd, threshold, edge, valley, ax, ind,
+              title= title, save = save, path=path, filename_roi=filename_roi)
 
     return ind, spike
 
 def _plot(x, spike, mph, mpd, threshold, edge, valley, ax, ind, title,
-          save=False, path=''):
+          save=False, path='',filename_roi=''):
     """Plot results of the detect_peaks function, see its help."""
 
 
@@ -200,8 +201,9 @@ def _plot(x, spike, mph, mpd, threshold, edge, valley, ax, ind, title,
                      % (mode, str(title)))
         # plt.grid()
         if save:
-            filename = 'single_trace_cell_{}.pdf'.format(str(title))
-            if os.path.isfile(path+filename):
+            path_name = path.replace("/","_")
+            filename = path_name+'single_trace_cell_{}'.format(str(title))+filename_roi+'.pdf'
+            if os.path.isfile(path+'/'+filename):
                 expand = 0
                 while True:
                     expand += 1
@@ -211,4 +213,4 @@ def _plot(x, spike, mph, mpd, threshold, edge, valley, ax, ind, title,
                     else:
                         filename = new_filename
                         break
-            plt.savefig(path+"_"+filename, transparent=True)
+            plt.savefig(path+'/'+filename, transparent=True)
