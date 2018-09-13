@@ -9,16 +9,20 @@ def list_shift(img):
     if len(img)%10!=0:
         raise ValueError("Your stack need to be divisible by 10")
 
-    if len(img)%200!=0:
-        size = len(img)-len(img)%200
-        split = len(img[0:size])/200
+    if len(img)%100!=0:
+        size = len(img)-len(img)%100
+        split = len(img[0:size])/100
         l = np.split(img[0:size], split)
-        l.append(img[size:len(img)])
+        if len(img)%100 > 50:
+            l.append(img[size:len(img)])
+        else:
+            pass
     else:
-        split = len(img)/200
+        split = len(img)/100
         l = np.split(img, split)
 
-    values = [100,200]
+    print(len(l))
+    values = [50,100]
 
     shifts = np.zeros(2)
     add=0
